@@ -1,0 +1,71 @@
+!!! TEST is FINISHED !!!
+2017-01-11 10:53:12,513 - INFO - Result : pps_1_vms_jitter_binary_1460_dpdk_4ports_ipv6.ixncfg : 10.87.132.18//results//DP.Rfc2544Tput//dbe083bb-2aef-4aef-b2f4-5d1195c97a4b//Run0001/AggregateResults.csv 
+2017-01-11 10:53:12,619 - INFO - RFC Test FINISHED
+2017-01-11 10:53:24,113 - INFO - Trial,Framesize,Iteration,Agg Tx Rate (% Line Rate),Agg Rx Throughput (% Line Rate),Agg Rx Throughput (fps),Agg Rx Throughput (Kbps),Agg Tx Count (frames),Agg Rx Count (frames),Agg Frame Loss (frames),Agg Frame Loss (%),Min Delay Variation (ns),Max Delay Variation (ns),Avg Delay Variation (ns)
+1,1460,15,24.576,24.535,828894.928,9681492.754,48985412.000,48984812.000,600.000,0.001,0.000,100250.000,2890.250
+2017-01-11 10:53:24,113 - INFO - Dettaching policy perf_svc_policy from vn vn100-right
+2017-01-11 10:53:24,837 - INFO - Dettaching policy perf_svc_policy from vn vn100-left
+2017-01-11 10:53:25,826 - INFO - Deleted policy perf_svc_policy
+--
+!!! TEST is FINISHED !!!
+2017-01-11 11:29:42,971 - INFO - Result : pps_1_vms_latency_binary_1460_dpdk_4ports_ipv6.ixncfg : 10.87.132.18//results//DP.Rfc2544Tput//549e4eff-bd18-4286-8bde-65bcac7fe54c//Run0001/AggregateResults.csv 
+2017-01-11 11:29:43,076 - INFO - RFC Test FINISHED
+2017-01-11 11:29:55,121 - INFO - Trial,Framesize,Iteration,Agg Tx Rate (% Line Rate),Agg Rx Throughput (% Line Rate),Agg Rx Throughput (fps),Agg Rx Throughput (Kbps),Agg Tx Count (frames),Agg Rx Count (frames),Agg Frame Loss (frames),Agg Frame Loss (%),Min Latency (ns),Max Latency (ns),Avg Latency (ns)
+1,1460,15,24.576,24.535,828894.989,9681493.469,48985412.000,48984828.000,584.000,0.001,70570.000,97252820.000,48469515.500
+2017-01-11 11:29:55,122 - INFO - Dettaching policy perf_svc_policy from vn vn100-right
+2017-01-11 11:29:55,898 - INFO - Dettaching policy perf_svc_policy from vn vn100-left
+2017-01-11 11:29:57,479 - INFO - Deleted policy perf_svc_policy
+--
+!!! TEST is FINISHED !!!
+2017-01-11 12:03:12,306 - INFO - Result : pps_1_vms_jitter_binary_1460_dpdk_4ports.ixncfg : 10.87.132.18//results//DP.Rfc2544Tput//f9c8b855-444c-4396-9031-e484e9cb5957//Run0001/AggregateResults.csv 
+2017-01-11 12:03:12,475 - INFO - RFC Test FINISHED
+2017-01-11 12:03:24,571 - INFO - Trial,Framesize,Iteration,Agg Tx Rate (% Line Rate),Agg Rx Throughput (% Line Rate),Agg Rx Throughput (fps),Agg Rx Throughput (Kbps),Agg Tx Count (frames),Agg Rx Count (frames),Agg Frame Loss (frames),Agg Frame Loss (%),Min Delay Variation (ns),Max Delay Variation (ns),Avg Delay Variation (ns)
+1,1460,10,17.728,17.728,598906.351,6995226.183,35335468.000,35335468.000,0.000,0.000,0.000,138470.000,2620.250
+2017-01-11 12:03:24,571 - INFO - Dettaching policy perf_svc_policy from vn vn100-right
+2017-01-11 12:03:25,025 - INFO - Dettaching policy perf_svc_policy from vn vn100-left
+2017-01-11 12:03:25,878 - INFO - Deleted policy perf_svc_policy
+--
+!!! TEST is FINISHED !!!
+2017-01-11 12:36:40,481 - INFO - Result : pps_1_vms_latency_binary_1460_dpdk_4ports.ixncfg : 10.87.132.18//results//DP.Rfc2544Tput//9c2b0425-6408-408e-b6ca-1cb53381d033//Run0001/AggregateResults.csv 
+2017-01-11 12:36:40,650 - INFO - RFC Test FINISHED
+2017-01-11 12:36:52,719 - INFO - Trial,Framesize,Iteration,Agg Tx Rate (% Line Rate),Agg Rx Throughput (% Line Rate),Agg Rx Throughput (fps),Agg Rx Throughput (Kbps),Agg Tx Count (frames),Agg Rx Count (frames),Agg Frame Loss (frames),Agg Frame Loss (%),Min Latency (ns),Max Latency (ns),Avg Latency (ns)
+1,1460,11,17.744,17.744,599453.243,7001613.882,35367736.000,35367736.000,0.000,0.000,58090.000,663660.000,77428.000
+2017-01-11 12:36:52,720 - INFO - Dettaching policy perf_svc_policy from vn vn100-right
+2017-01-11 12:36:53,733 - INFO - Dettaching policy perf_svc_policy from vn vn100-left
+2017-01-11 12:36:54,977 - INFO - Deleted policy perf_svc_policy
+--
+!!! TEST is FINISHED !!!
+2017-01-11 14:01:30,645 - INFO - Result : pps_1_vms_jitter_binary_64_200_IMIX_dpdk_4ports.ixncfg : 10.87.132.18//results//DP.Rfc2544Tput//a91481cb-81a3-489c-9e02-6e48dcdea283//Run0001/AggregateResults.csv 
+2017-01-11 14:01:30,714 - INFO - RFC Test FINISHED
+2017-01-11 14:01:42,718 - INFO - Trial,Framesize,Iteration,Agg Tx Rate (% Line Rate),Agg Rx Throughput (% Line Rate),Agg Rx Throughput (fps),Agg Rx Throughput (Kbps),Agg Tx Count (frames),Agg Rx Count (frames),Agg Frame Loss (frames),Agg Frame Loss (%),Min Delay Variation (ns),Max Delay Variation (ns),Avg Delay Variation (ns)
+1,74,1,5.640,5.640,3000001.343,1776000.795,177000000.000,176999982.000,18.000,0.000,0.000,120770.000,1263.750
+1,200,15,0.441,0.000,,,5910444.000,0.000,5910444.000,100.000,,,
+1,IMIX,15,0.751,0.000,,,5910444.000,0.000,5910444.000,100.000,,,
+2017-01-11 14:01:42,719 - INFO - Dettaching policy perf_svc_policy from vn vn100-right
+--
+!!! TEST is FINISHED !!!
+2017-01-11 15:32:12,191 - INFO - Result : pps_1_vms_jitter_binary_64_200_IMIX_dpdk_4ports_ipv6.ixncfg : 10.87.132.18//results//DP.Rfc2544Tput//000b96b7-0593-4947-bf88-f5b65db6d1a6//Run0001/AggregateResults.csv 
+2017-01-11 15:32:12,329 - INFO - RFC Test FINISHED
+2017-01-11 15:32:24,344 - INFO - Trial,Framesize,Iteration,Agg Tx Rate (% Line Rate),Agg Rx Throughput (% Line Rate),Agg Rx Throughput (fps),Agg Rx Throughput (Kbps),Agg Tx Count (frames),Agg Rx Count (frames),Agg Frame Loss (frames),Agg Frame Loss (%),Min Delay Variation (ns),Max Delay Variation (ns),Avg Delay Variation (ns)
+1,94,17,10.564,10.564,4633181.732,3484152.663,273373748.000,273359733.000,14015.000,0.005,0.000,103570.000,761.750
+1,200,16,19.998,19.998,4544919.340,7271870.944,268161192.000,268152184.000,9008.000,0.003,0.000,39160.000,650.250
+1,IMIX,16,23.353,23.311,3015620.087,8841794.505,178242372.000,178226095.000,16277.000,0.009,0.000,143940.000,3997.000
+2017-01-11 15:32:24,345 - INFO - Dettaching policy perf_svc_policy from vn vn100-right
+--
+!!! TEST is FINISHED !!!
+2017-01-11 16:53:41,438 - INFO - Result : pps_1_vms_latency_binary_64_200_IMIX_dpdk_4ports.ixncfg : 10.87.132.18//results//DP.Rfc2544Tput//d9fef86d-2bd5-4b6b-952f-e1670b4d8845//Run0001/AggregateResults.csv 
+2017-01-11 16:53:42,847 - INFO - RFC Test FINISHED
+2017-01-11 16:53:55,177 - INFO - Trial,Framesize,Iteration,Agg Tx Rate (% Line Rate),Agg Rx Throughput (% Line Rate),Agg Rx Throughput (fps),Agg Rx Throughput (Kbps),Agg Tx Count (frames),Agg Rx Count (frames),Agg Frame Loss (frames),Agg Frame Loss (%),Min Latency (ns),Max Latency (ns),Avg Latency (ns)
+1,74,11,5.209,5.209,2770593.992,1640191.643,163465724.000,163464986.000,738.000,0.000,45780.000,568080.000,67180.250
+1,200,15,0.441,0.432,98173.483,157077.574,5910444.000,5792236.000,118208.000,2.000,48360.000,938100.000,62717.750
+1,IMIX,15,0.751,0.736,98173.618,278682.529,5910444.000,5792244.000,118200.000,2.000,45330.000,1557590.000,66663.167
+2017-01-11 16:53:55,178 - INFO - Dettaching policy perf_svc_policy from vn vn100-right
+--
+!!! TEST is FINISHED !!!
+2017-01-11 18:24:06,533 - INFO - Result : pps_1_vms_latency_binary_64_200_IMIX_dpdk_4ports_ipv6.ixncfg : 10.87.132.18//results//DP.Rfc2544Tput//5f613c10-ab76-40bf-8541-ef0afee723cf//Run0001/AggregateResults.csv 
+2017-01-11 18:24:06,637 - INFO - RFC Test FINISHED
+2017-01-11 18:24:18,633 - INFO - Trial,Framesize,Iteration,Agg Tx Rate (% Line Rate),Agg Rx Throughput (% Line Rate),Agg Rx Throughput (fps),Agg Rx Throughput (Kbps),Agg Tx Count (frames),Agg Rx Count (frames),Agg Frame Loss (frames),Agg Frame Loss (%),Min Latency (ns),Max Latency (ns),Avg Latency (ns)
+1,94,15,10.627,10.626,4660518.792,3504710.132,274985228.000,274972668.000,12560.000,0.005,50650.000,1719590.000,340079.750
+1,200,9,19.903,19.903,4523412.772,7237460.435,266882812.000,266882785.000,27.000,0.000,53990.000,1413330.000,270821.500
+1,IMIX,16,23.353,23.311,3015623.577,8841799.002,178242372.000,178226307.000,16065.000,0.009,60400.000,101271790.000,52869213.000
+2017-01-11 18:24:18,634 - INFO - Dettaching policy perf_svc_policy from vn vn100-right

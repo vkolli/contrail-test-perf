@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites>
+  <testsuite errors="0" failures="0" id="0" name="" package="" skipped="0" tests="11" time="28139.177">
+    <testcase classname="serial_scripts.perf.ixia.test_ixia_perf.PerfIxiaTest" name="test_ixia_0PPS_jitter_DPDK_4core[perf_DPDK]" time="2953.926" />
+
+    <testcase classname="serial_scripts.perf.ixia.test_ixia_perf.PerfIxiaTest" name="test_ixia_0PPS_jitter_DPDK_4core_v6[perf_DPDK]" time="2941.438" />
+
+    <testcase classname="serial_scripts.perf.ixia.test_ixia_perf.PerfIxiaTest" name="test_ixia_0PPS_latency_DPDK_4core[demo,perf_DPDK]" time="2941.007" />
+
+    <testcase classname="serial_scripts.perf.ixia.test_ixia_perf.PerfIxiaTest" name="test_ixia_0PPS_latency_DPDK_4core_v6[perf_DPDK]" time="2578.751" />
+
+    <testcase classname="serial_scripts.perf.ixia.test_ixia_perf.PerfIxiaTest" name="test_ixia_1460_PPS_jitter_DPDK_4core_v6[perf_DPDK]" time="2579.806" />
+
+    <testcase classname="serial_scripts.perf.ixia.test_ixia_perf.PerfIxiaTest" name="test_ixia_1460_PPS_latency_DPDK_4core_v6[perf_DPDK]" time="2579.468" />
+
+    <testcase classname="serial_scripts.perf.ixia.test_ixia_perf.PerfIxiaTest" name="test_ixia_PPS_1460jitter_DPDK_4core[perf_DPDK]" time="2580.888" />
+
+    <testcase classname="serial_scripts.perf.ixia.test_ixia_perf.PerfIxiaTest" name="test_ixia_PPS_1460latency_DPDK_4core[perf_DPDK]" time="2579.346" />
+
+    <testcase classname="serial_scripts.perf.ixia.test_ixia_perf.PerfIxiaTest" name="test_ixia_PPS_jitter_DPDK_4coremq[perf_DPDK,perf_MQ]" time="2401.407" />
+
+    <testcase classname="serial_scripts.perf.ixia.test_spirent_perf.PerfIxiaTest" name="test_spirent_flow_DPDK[perf_DPDK]" time="1659.942" />
+
+    <testcase classname="serial_scripts.perf.ixia.test_spirent_perf.PerfIxiaTest" name="test_spirent_flow_scale_DPDK[perf_DPDK]" time="2314.059" />
+
+  </testsuite>
+  <testsuite errors="0" failures="0" id="1" name="" package="" skipped="0" tests="0" time="2.053">
+    <properties>
+      <property name="LogsLocation" value="http://10.204.216.50/Docs/logs/3.2.1.0-22_2017_03_02_23_38_48/logs/" />
+      <property name="Build" value="3.2.1.0-22" />
+      <property name="Report" value="http://10.204.216.50/Docs/logs/3.2.1.0-22_2017_03_02_23_38_48/junit-noframes.html" />
+      <property name="Topology" value="&lt;br/&gt;DISTRO : &quot;Ubuntu 14.04.4 LTS&quot; &lt;br/&gt;SKU :  &lt;br/&gt;Config Nodes : [u&apos;5b3s45&apos;] &lt;br/&gt;Control Nodes : [u&apos;5b3s45&apos;] &lt;br/&gt;Compute Nodes : [u&apos;5b4s30&apos;, u&apos;5b4s39&apos;] &lt;br/&gt;Openstack Node : 5b3s45 &lt;br/&gt;WebUI Node : 5b3s45 &lt;br/&gt;Analytics Nodes : [u&apos;5b3s45&apos;] &lt;br/&gt;Database Nodes : [u&apos;5b3s45&apos;] &lt;br/&gt;Physical Devices : [u&quot;&apos;cmbu-lakewood&apos;&quot;] &lt;br/&gt;" />
+      <property name="cores" value="{}" />
+    </properties>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,115 @@
+13d12
+< from common.device_connection import NetconfConnection
+39c38
+<         cls.encap_type = ["MPLSoUDP","MPLSoGRE"]
+---
+>         cls.encap_type = ["MPLSoUDP","MPLSoGRE","VXLAN"]
+53,61d51
+<         cls.mx1_ip = '10.87.64.246'
+<         cls.mx2_ip = '10.87.140.181'
+<         cls.mx_user = 'root'
+<         cls.mx_password = 'Embe1mpls'
+<         cls.mx1_handle = NetconfConnection(host = cls.mx1_ip,username=cls.mx_user,password=cls.mx_password)
+<         cls.mx1_handle.connect()
+<         cls.mx2_handle = NetconfConnection(host = cls.mx2_ip,username=cls.mx_user,password=cls.mx_password)
+<         cls.mx2_handle.connect()
+<  
+67,69c57
+<         if not cls.set_nova_flavor_key_delete():
+<             self.logger.error("ERROR: In deleting flavor keys")
+<             return False
+---
+> 
+228,229c216,217
+<         self.cpu_id_10=['8','9','10','11','12','13','14','15']
+<         #self.cpu_id_10=['14','15','16','17','18','19','20','21','22','23','24','25','26','27']
+---
+>         #self.cpu_id_10=['8','9','10','11','12','13','14','15']
+>         self.cpu_id_10=['14','15','16','17','18','19','20','21','22','23','24','25','26','27']
+326,329d313
+<         import pdb;pdb.set_trace()
+<         # DEBUG MX
+<         self.configure_mx('MPLSoGRE',self.mx1_handle) 
+<         self.restart_control()
+345c329,330
+<         #time.sleep(100)
+---
+> 	import pdb;pdb.set_trace()
+>         time.sleep(100)
+349,353c334,335
+<         #if not self.set_nova_flavor_key_delete():
+<         #    self.logger.error("ERROR: In deleting flavor keys")
+<         #    return False
+<         if not self.cleanup_vms():
+<             self.logger.error("ERROR: In deleting service instance VM and template")
+---
+>         if not self.set_nova_flavor_key_delete():
+>             self.logger.error("ERROR: In deleting flavor keys")
+354a337,339
+>         #if not self.cleanup_vms():
+>         #    self.logger.error("ERROR: In deleting service instance VM and template")
+>         #    return False
+418,423c403,408
+<         #if not self.set_nova_flavor_key_delete():
+<         #    self.logger.error("ERROR: In deleting flavor keys")
+<         #    return False
+<         #if not self.cleanup_vms():
+<         #    self.logger.error("ERROR: In deleting service instance VM and template")
+<         #    return False
+---
+>         if not self.set_nova_flavor_key_delete():
+>             self.logger.error("ERROR: In deleting flavor keys")
+>             return False
+>         if not self.cleanup_vms():
+>             self.logger.error("ERROR: In deleting service instance VM and template")
+>             return False
+465d449
+<         return True
+530c514
+<         #self.set_nova_flavor_key_delete()
+---
+>         self.set_nova_flavor_key_delete()
+582,583c566,567
+<         cmd='for intf in p1p2 p2p2 ; do for i in $(grep $intf /proc/interrupts | awk {\'print $1\'} | sed s/://g);  do echo "8,80" > /proc/irq/"$i"/smp_affinity ; done ; done'
+<         #cmd='for intf in p1p2 p2p2 ; do for i in $(grep $intf /proc/interrupts | awk {\'print $1\'} | sed s/://g);  do echo "0,300" > /proc/irq/"$i"/smp_affinity ; done ; done'
+---
+>         #cmd='for intf in p1p2 p2p2 ; do for i in $(grep $intf /proc/interrupts | awk {\'print $1\'} | sed s/://g);  do echo "8,80" > /proc/irq/"$i"/smp_affinity ; done ; done'
+>         cmd='for intf in p1p2 p2p2 ; do for i in $(grep $intf /proc/interrupts | awk {\'print $1\'} | sed s/://g);  do echo "0,300" > /proc/irq/"$i"/smp_affinity ; done ; done'
+585,586c569,570
+<         cmd='for intf in p1p1 p2p1 ; do for i in $(grep $intf /proc/interrupts | awk {\'print $1\'} | sed s/://g);  do echo "4,40" > /proc/irq/"$i"/smp_affinity ; done ; done'
+<         #cmd='for intf in p1p1 p2p1 ; do for i in $(grep $intf /proc/interrupts | awk {\'print $1\'} | sed s/://g);  do echo "0,C00" > /proc/irq/"$i"/smp_affinity ; done ; done'
+---
+>         #cmd='for intf in p1p1 p2p1 ; do for i in $(grep $intf /proc/interrupts | awk {\'print $1\'} | sed s/://g);  do echo "4,40" > /proc/irq/"$i"/smp_affinity ; done ; done'
+>         cmd='for intf in p1p1 p2p1 ; do for i in $(grep $intf /proc/interrupts | awk {\'print $1\'} | sed s/://g);  do echo "0,C00" > /proc/irq/"$i"/smp_affinity ; done ; done'
+631,661d614
+< 
+<     def configure_mx(self,encap,handle):
+<         cmd = []
+<         if encap == 'MPLSoUDP':
+<             if handle.host  == self.mx1_ip: 
+<                 cmd.append('set groups ixia_flow routing-options dynamic-tunnels contrail udp')
+<                 cmd.append('set groups ixia_flow protocols bgp group contrail export test1-export')
+<             elif handle.host == self.mx2_ip: 
+<                 cmd.append('set groups __contrail__ routing-options dynamic-tunnels __contrail__ udp')
+<                 cmd.append('set groups __contrail__ protocols bgp group __contrail__ export test1-export') 
+< 
+<         elif encap == 'MPLSoGRE':
+<             if handle.host  == self.mx1_ip: 
+<                 cmd.append('set groups ixia_flow routing-options dynamic-tunnels contrail gre')
+<                 cmd.append('delete groups ixia_flow protocols bgp group contrail export test1-export')
+<             elif handle.host == self.mx2_ip: 
+<                 cmd.append('set groups __contrail__ routing-options dynamic-tunnels __contrail__ gre')
+<                 cmd.append('delete groups __contrail__ protocols bgp group __contrail__ export test1-export') 
+< 
+<         cli_output = handle.config(stmts = cmd,ignore_errors=True,timeout = 120) 
+< 
+<         return True
+< 
+< 
+<     def restart_control(self):
+<         with settings(
+<             host_string='%s@%s' % (
+<                 self.inputs.username, self.inputs.cfgm_ips[0]),
+<                 password=self.inputs.password, warn_only=True, abort_on_prompts=False, debug=True):
+<             run('service contrail-control restart')
+<         return True

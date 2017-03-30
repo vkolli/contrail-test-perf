@@ -1,0 +1,7 @@
+<testsuite errors="0" failures="0" name="" skipped="0" tests="5" time="12615.755">
+<testcase classname="serial_scripts.perf.ixia.test_ixia_perf.PerfIxiaTest" name="test_ixia_PPS_jitter_Netronome_4core[perf_netronome]" time="2647.197"/>
+<testcase classname="serial_scripts.perf.ixia.test_ixia_perf.PerfIxiaTest" name="test_ixia_PPS_jitter_Netronome_4core_mplsoudp[perf_netronome]" time="2791.269"/>
+<testcase classname="serial_scripts.perf.ixia.test_ixia_perf.PerfIxiaTest" name="test_ixia_PPS_latency_Netronome_4core[perf_netronome]" time="2788.680"/>
+<testcase classname="serial_scripts.perf.ixia.test_ixia_perf.PerfIxiaTest" name="test_ixia_PPS_latency_Netronome_4core_mplsoudp[perf_netronome]" time="2791.062"/>
+<testcase classname="serial_scripts.perf.ixia.test_spirent_perf.PerfIxiaTest" name="test_spirent_flow_netronome[perf_netronome]" time="1577.681"/>
+</testsuite>

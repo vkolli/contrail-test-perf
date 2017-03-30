@@ -1,0 +1,4 @@
+Trial,Framesize,Iteration,Agg Tx Rate (% Line Rate),Agg Rx Throughput (% Line Rate),Agg Rx Throughput (fps),Agg Rx Throughput (Kbps),Agg Tx Count (frames),Agg Rx Count (frames),Agg Frame Loss (frames),Agg Frame Loss (%),Min Delay Variation (ns),Max Delay Variation (ns),Avg Delay Variation (ns)
+1,74,1,9.400,9.400,4999799.208,2959881.131,295000000.000,294988030.000,11970,0.004,0.000,4988790.000,8039.650
+1,200,1,22.000,22.000,4999953.832,7999926.131,295000000.000,294997193.000,2807,0.001,0.000,566070.000,10766.315
+1,200,2,22.440,22.177,5040171.344,8064274.150,300900000.000,297900649.000,2999351,0.997,0.000,1859030.000,10210.553==================================================================

@@ -1,0 +1,734 @@
+import os
+import signal
+import re
+import struct
+import socket
+import random
+from fabric.state import connections as fab_connections
+import test
+import traffic_tests
+from common.contrail_test_init import *
+from common import isolated_creds
+from vn_test import *
+from vm_test import *
+from floating_ip import *
+from common.servicechain.config import ConfigSvcChain
+from common.servicechain.verify import VerifySvcChain
+from common.servicechain.mirror.verify import VerifySvcMirror
+from common.servicechain.mirror.config import ConfigSvcMirror
+from tcutils.commands import *
+import threading
+import thread
+import time
+import copy
+
+class PerfBaseDpdk(test.BaseTestCase,VerifySvcMirror):
+
+    @classmethod
+    def setUpClass(cls):
+        super(PerfBaseDpdk, cls).setUpClass()
+        cls.isolated_creds = isolated_creds.IsolatedCreds(cls.__name__, \
+				cls.inputs, ini_file = cls.ini_file, \
+				logger = cls.logger)
+        cls.isolated_creds.setUp()
+        cls.project = cls.isolated_creds.create_tenant() 
+        cls.isolated_creds.create_and_attach_user_to_tenant()
+        cls.inputs = cls.isolated_creds.get_inputs()
+        cls.connections = cls.isolated_creds.get_conections() 
+        cls.nova_h = cls.connections.nova_h
+        cls.orch = cls.connections.orch
+        cls.vnc_lib_fixture = cls.connections.vnc_lib_fixture
+#        cls.encap_type = ["MPLSoUDP","MPLSoGRE","VXLAN"]
+        cls.encap_type = ["MPLSoUDP"]
+        cls.results = 'results_%s'%random.randint(0,100000)
+        cls.results_file = open(cls.results,"aw")
+        cls.process_list = ['qemu','vhost']
+        cls.duration = 100
+        cls.timeout = cls.duration + 60
+        cls.nova_cpu = ['8-15'] 
+        cls.family = ''
+        cls.ixia_linux_host = '10.87.132.179'
+        cls.set_cpu_cores = 4 
+        cls.set_si = 1
+        cls.dpdk_svc_scaling = False
+#        cls.logger= cls.inputs.logger
+    #end setUpClass
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.results_file.close() 
+        super(PerfBaseDpdk, cls).tearDownClass()
+    #end tearDownClass 
+
+    def launch_vm_on_nodes(self,hosts,family):
+        '''
+        ha_start will spawn VM's and starts traffic from 
+        VM - VM , VM - floating IP.
+        '''
+        self.vn1_name='vn10000'
+        self.vn1_subnets=['20.1.1.0/24']
+        self.vmlist = []
+        self.vm_fixture = []
+        self.vm_num = 2
+        self.cpu_id_0=['16','17','18','19','20','21','22','23']
+        self.cpu_id_00=['16','17','18','19','20','21','22','23']
+        self.cpu_id_10=['8','9','10','11','12','13','14','15']
+        self.cpu_id_11=['24','25','26','27','28','29','30','31']
+        self.images = ['dpdk-pktgen-auto','dpdk-l3fwd-auto']
+
+        for i in range(0,self.vm_num):
+            val = random.randint(1,100000)
+            self.vmlist.append("vm-test"+str(val))
+
+        for i in range(0,self.vm_num):
+            if not self.set_perf_mode(hosts[i]):
+                self.logger.error("Not able to set perf mode ")
+            if not self.set_nova_vcpupin(hosts[i]):
+                self.logger.error("Not able to set vcpu in nova.conf")
+
+        self.inputs.set_af(family)
+
+        if family == 'v6':
+            self.vn1_fixture= self.useFixture(VNFixture(project_name= self.inputs.project_name, connections= self.connections,vn_name=self.vn1_name, inputs= self.inputs,router_asn=self.inputs.router_asn, rt_number=self.inputs.mx_rt))
+        else:
+            self.vn1_fixture= self.useFixture(VNFixture(project_name= self.inputs.project_name, connections= self.connections,vn_name=self.vn1_name, inputs= self.inputs, subnets= self.vn1_subnets,router_asn=self.inputs.router_asn, rt_number=self.inputs.mx_rt))
+
+        assert self.vn1_fixture.verify_on_setup()
+
+        for i in range(0,self.vm_num):
+            self.vm_fixture.append(self.useFixture(VMFixture(project_name= self.inputs.project_name, connections= self.connections, vn_objs = [ self.vn1_fixture.obj ], vm_name= self.vmlist[i],flavor='contrail_flavor_2cpu',image_name=self.images[i],node_name=hosts[i])))
+
+
+        for i in range(0,self.vm_num):
+            assert self.vm_fixture[i].verify_on_setup()
+
+        for i in range(0,self.vm_num):
+            if self.inputs.orchestrator =='vcenter':
+                out1 = self.orch.wait_till_vm_is_active( self.vm_fixture[i].vm_obj )
+            else:
+                out1 = self.nova_h.wait_till_vm_is_up( self.vm_fixture[i].vm_obj )
+
+            if out1 == False: return {'result':out1, 'msg':"%s failed to come up"%self.vm_fixture[i].vm_name}
+
+        for host in hosts:
+            for proc in self.process_list:
+                if not self.update_process_cpu(host,proc):
+                    self.logger.error("Not able to pin cpu :%s "%proc)
+
+        for host in hosts:
+            if not self.update_vrotuer_sysctl(host,self.cpu_id_10):
+                self.logger.error("Error in updating sysctl")
+                return False
+
+        for i in range(0,self.vm_num):
+            if not self.start_v6_server(self.vm_fixture[i]):
+                self.logger.error("Not able start v6 server")
+                return False
+
+        #import pdb;pdb.set_trace()
+
+        return True
+
+    def run_perf_tests(self,test_id,mode,proto,family):
+        self.host_list = self.connections.orch.get_hosts()
+        if mode == 'different':
+            if not self.launch_vm_on_nodes([self.host_list[0],self.host_list[1]],family):
+                self.logger.error("Failed to launch VMs")
+        elif mode == 'same':
+            if not self.launch_vm_on_nodes([self.host_list[0],self.host_list[0]],family):
+                self.logger.error("Failed to launch VMs")
+
+        #import pdb;pdb.set_trace()
+        if test_id == 'THROUGHPUT':
+            return self.throughput_test(mode,proto)
+
+        elif test_id == 'LATENCY':
+            return self.latency_test(mode,proto)
+
+    def throughput_test(self,mode,proto):
+
+#        result = self.start_dpdk_l3fwd(self.vm_fixture[1],self.duration)
+
+        for id in range(0,len(self.encap_type)):
+            self.update_encap_mode(self.inputs.host_data[self.inputs.cfgm_ip]['host_ip'],self.encap_type[id])
+            if proto == 'TCP':
+                if not self.run_tcp_throughput(self.vm_fixture[0],self.vm_fixture[1],self.duration):
+                    self.logger.error("ERROR in TCP throughput test")
+                    return False
+            if proto == 'UDP':
+                if not self.run_udp_throughput(self.vm_fixture[0],self.vm_fixture[1],self.duration):
+                    self.logger.error("ERROR in UDP throughput test")
+                    return False
+
+    def latency_test(self,mode,proto):
+        for id in range(0,len(self.encap_type)):
+            self.update_encap_mode(self.inputs.host_data[self.inputs.cfgm_ip]['host_ip'],self.encap_type[id])
+            if proto == 'TCP':
+                if not self.run_tcp_latency(self.vm_fixture[0],self.vm_fixture[1].vm_ip,self.duration):
+                    self.logger.error("ERROR in TCP Request/Response test")
+                    return False
+            if proto == 'UDP':
+                if not self.run_udp_latency(self.vm_fixture[0],self.vm_fixture[1].vm_ip,self.duration):
+                    self.logger.error("ERROR in UDP Request/Response test")
+                    return False
+        return True 
+
+    def run_tcp_throughput(self,src_vm_hdl,dest_vm_hdl,duration):
+        thread_id = 0
+        result = self.start_dpdk_l3fwd(dest_vm_hdl,duration)
+        #import pdb ; pdb.set_trace()
+        #for payload in  [ 64, 128, 512, 1400 ]:
+        for payload in  [64]:
+            perf_list = []
+            time.sleep(5)
+            result = self.start_dpdk_ptkgen(src_vm_hdl,dest_vm_hdl,payload)
+            time.sleep(200)
+            result = "PAYLOAD : %s TCP %s THROUGHPUT :  : \n"%(payload ,self.inputs.get_af())
+            self.logger.info("Result : %s "%result)
+            self.print_results(result)
+            self.get_dpdk_results(src_vm_hdl)
+            #import pdb ; pdb.set_trace()
+        time.sleep(10)
+        return True
+
+    def run_udp_throughput(self,src_vm_hdl,dest_vm_hdl,duration):
+        for payload in  [ 64, 128, 512, 1400, 16348 ]:
+        #for payload in  [1400]:
+            perf_list = []
+            perf_dict = {}
+            threads = []
+            thread_id = 0
+            for iterate in range(0,3):
+                if not iterate:
+                    try:
+                        threads.append(threading.Thread(target = self.start_pps, args = (dest_vm_hdl,duration,)))
+                        threads[thread_id].start()
+                        thread_id = thread_id + 1
+                        threads.append(threading.Thread(target = self.start_pps, args = (src_vm_hdl,duration,)))
+                        threads[thread_id].start()
+                        thread_id = thread_id + 1
+                    except:
+                        self.logger.error("Unable to start thread \n")
+
+                if self.inputs.get_af() == 'v6':
+                    cmd = 'netperf -H %s -t UDP_STREAM -6 -p 12000 -l %s -- -m %s'% (dest_vm_hdl.vm_ip,duration,payload)
+                else :
+                    cmd = 'netperf -H %s -t UDP_STREAM -l %s -- -m %s'% (dest_vm_hdl.vm_ip,duration,payload)
+
+                time.sleep(5)
+                src_vm_hdl.run_cmd_on_vm(cmds=[cmd],as_sudo=True, timeout=self.timeout)
+                result = src_vm_hdl.return_output_cmd_dict[cmd]
+                self.logger.info("Result : %s "%result)
+                result = result.replace("\r", "").replace("\t","")
+                result = result.split("\n")
+                send = re.split('\s+',result[6]);
+                recv = re.split('\s+',result[7]);
+                perf_dict[float(recv[3])] = float(send[5])
+                perf_list.append(float(recv[3]))
+                perf_list.sort()
+                print perf_dict
+            time.sleep(5)
+            for iterate in range(0,len(threads)):
+                threads[iterate].join()
+            result = "PAYLOAD : %s UDP %s THROUGHPUT send : %s recv : %s \n"%(payload , self.inputs.get_af(),perf_dict[(perf_list[len(perf_list)-1])],(perf_list[len(perf_list)-1]))
+            self.logger.info("Result : %s "%result)
+            self.print_results(result)
+        return True
+
+    def run_tcp_latency(self,client_hdl,ip,duration):
+        perf_list = []
+        for iterate in range(0,3):
+            if self.inputs.get_af() == 'v6':
+                cmd = 'netperf -H %s -6 -p 12000 -t TCP_RR -l %s -vv'% (ip,duration)
+            else:
+                cmd = 'netperf -H %s -t TCP_RR -l %s -vv'% (ip,duration)
+            client_hdl.run_cmd_on_vm(cmds=[cmd],as_sudo=True, timeout=self.timeout)
+            result = client_hdl.return_output_cmd_dict[cmd]
+            self.logger.info("Result : %s "%result)
+            result = result.replace("\r", "").replace("\t","")
+            result = result.split("\n")
+            for line in result:
+                self.logger.info("line : %s "%line)
+            perf_list.append(float(result[2]))
+            perf_list.sort()
+        result = "TCP %s Request/Response : %s : \n"%(self.inputs.get_af(),perf_list[len(perf_list)-1])
+        self.logger.info("Result : %s "%result)
+        self.print_results(result)
+        return True
+
+    def run_udp_latency(self,client_hdl,ip,duration):
+        perf_list = []
+        for iterate in range(0,3):
+            if self.inputs.get_af() == 'v6':
+                cmd = 'netperf -H %s -6 -p 12000 -t UDP_RR -l %s -vv'% (ip,duration)
+            else:
+                cmd = 'netperf -H %s -t UDP_RR -l %s -vv'% (ip,duration)
+            client_hdl.run_cmd_on_vm(cmds=[cmd],as_sudo=True, timeout=self.timeout)
+            result = client_hdl.return_output_cmd_dict[cmd]
+            self.logger.info("Result : %s "%result)
+            result = result.replace("\r", "").replace("\t","")
+            result = result.split("\n")
+            for line in result:
+                self.logger.info("line : %s "%line)
+            perf_list.append(float(result[2]))
+            perf_list.sort()
+        result = "UDP %s Request/Response : %s : \n"%(self.inputs.get_af(),perf_list[len(perf_list)-1])
+        self.logger.info("Result : %s "%result)
+        self.print_results(result)
+        return True
+
+    def print_results(self,result):
+        self.results_file.write(result)
+
+    def update_process_cpu(self,host,name):
+        cmd = 'ps ax | pgrep %s'%name
+        res = self.inputs.run_cmd_on_server(host, cmd)
+        res = res.replace("\r","")
+        res = res.split("\n")
+        for id in res:
+            self.logger.info("Process Id : %s "%id)
+            cmd = 'taskset -pc %s'%id
+            task_out = self.inputs.run_cmd_on_server(host, cmd)
+            task_out=task_out.split(" ")
+            self.logger.info("cpu mask :%s "%task_out[5])
+
+            if re.findall("8-15",task_out[5]):
+               if not self.set_task_pin(host,self.cpu_id_10,id):
+                    self.logger.error("Error in pinnng cpu :%s "%cmd)
+        #        del self.cpu_id_10[0]
+            elif re.findall("24-31",task_out[5]):
+                if not self.set_task_pin(host,self.cpu_id_11,id):
+                    self.logger.error("Error in pinnng cpu :%s "%cmd)
+                    return False 
+        #        del self.cpu_id_11[0]
+            elif re.findall("0-7",task_out[5]):
+                if not self.set_task_pin(host,self.cpu_id_00,id):
+                    self.logger.error("Error in pinnng cpu :%s "%cmd)
+                    return False 
+            elif re.findall("16-23",task_out[5]):
+                if not self.set_task_pin(host,self.cpu_id_0,id):
+                    self.logger.error("Error in pinnng cpu :%s "%cmd)
+                    return False 
+
+        #        del self.cpu_id_0[0]
+
+        return True
+
+    def get_cpu_core(self,cpu_id):
+        if len(cpu_id):
+            return cpu_id.pop(0) 
+        else:
+            return False
+
+    def set_task_pin(self,host,cpu_id,pid):
+        #import pdb;pdb.set_trace()
+        cpu_core = self.get_cpu_core(cpu_id)
+        if not cpu_core:
+            self.logger.error("Not able to get cpu core")
+            return False
+        for i in range(1,(self.set_cpu_cores)) :
+            cpu_core1 = self.get_cpu_core(cpu_id)
+        #cpu_core1 = (int(cpu_core) + self.set_cpu_cores - 1)
+        cmd = 'taskset -a -pc %s-%s %s'%(cpu_core,str(cpu_core1),pid)
+        task_out = self.inputs.run_cmd_on_server(host, cmd)
+        cmd = 'taskset -pc %s'%pid
+        task_out = self.inputs.run_cmd_on_server(host, cmd)
+        task_out=task_out.split(" ")
+        self.logger.info("cpu mask :%s "%task_out[5])
+        #if task_out[5] != cpu_core:
+        #    self.logger.error("cpu is not pinned :%s : %s "%(task_out[5],cpu_core))
+        #    return False
+        return True 
+
+    def update_vrotuer_sysctl(self,host,cpu_id):
+        cpu_core = self.get_cpu_core(cpu_id)
+        if not cpu_core:
+            self.logger.error("Not able to get cpu core")
+            return False
+        cmd='sysctl -w \"net.vrouter.q3=%s\"'%cpu_core
+        self.inputs.run_cmd_on_server(host, cmd)
+        cpu_core = self.get_cpu_core(cpu_id)
+        if not cpu_core:
+            self.logger.error("Not able to get cpu core")
+            return False
+        cmd='sysctl -w \"net.vrouter.q2=%s\"'%cpu_core
+        self.inputs.run_cmd_on_server(host, cmd)
+        return True
+
+    def update_encap_mode(self,host,mode):
+        cmd = '/usr/bin/python /opt/contrail/utils/provision_encap.py --api_server_ip 127.0.0.1 --api_server_port 8082 --encap_priority %s --vxlan_vn_id_mode "automatic" --oper add --admin_user "admin" --admin_password "contrail123"'%(mode)
+        out = self.inputs.run_cmd_on_server(host, cmd)
+        if not re.findall("Updated",out):
+            self.logger.error("Encapsulation not updated :%s "%out)
+            return False
+        result = ('Encapsulation Type :%s\n'%mode)
+        self.print_results(result)
+        return True
+
+    def set_perf_mode(self,host):
+        cmd='for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor ; do echo performance > $f; cat $f; done'
+        out = self.inputs.run_cmd_on_server(host, cmd)
+        cmd='service  irqbalance stop'
+        out = self.inputs.run_cmd_on_server(host, cmd)
+        cmd='mac=$(maclist=$(ifconfig vhost0 | awk {\'print $5\'}) ; echo $maclist | sed s/MTU.*$//g) ; \
+             intfs=$(ifconfig | grep $mac | awk {\'print $1\'} | sed s/vhost0//g | sed s/bond0//g ); \
+             for intf in $intfs ; do for i in $(grep $intf /proc/interrupts | awk {\'print $1\'} | sed s/://g); \
+             do echo "8000" > /proc/irq/"$i"/smp_affinity ; done ; done '
+        out = self.inputs.run_cmd_on_server(host, cmd)
+        return True
+
+    def set_nova_vcpupin(self,host):
+        cmd='openstack-config --set /etc/nova/nova.conf DEFAULT vcpu_pin_set %s'%self.nova_cpu[0]
+        out = self.inputs.run_cmd_on_server(host, cmd)
+        cmd='service nova-compute restart'
+        out = self.inputs.run_cmd_on_server(host, cmd)
+        return True
+
+    def set_nova_compute_service(self,host,mode):
+        username = self.inputs.host_data[self.inputs.openstack_ip]['username']
+        password = self.inputs.host_data[self.inputs.openstack_ip]['password']
+        with hide('everything'):
+            with settings(
+                host_string='%s@%s' % (username, self.inputs.openstack_ip),
+                    password=password):
+                services_info = run(
+                    'source /etc/contrail/openstackrc; nova service-%s %s nova-compute'%(mode,host))
+        services_info = services_info.split('\r\n')
+        return True
+
+    def start_v6_server(self,client_hdl):
+        cmd = 'sudo netserver -6 -p 12000 && sleep 5'
+        client_hdl.run_cmd_on_vm(cmds=[cmd],as_sudo=True, timeout=self.timeout)
+        result = client_hdl.return_output_cmd_dict[cmd]
+        self.logger.info("Result : %s "%result)
+        result = result.replace("\r", "").replace("\t","")
+        #result = result.split("\n")
+        if not re.findall('Starting netserver',result):
+            self.logger.error("Starting netserver failed : %"%result)
+            return False
+        return True       
+
+    def get_remote_pps(self,dest_vm_hdl,delay):
+        time.sleep(delay)
+        cmd = 'ls'
+        dest_vm_hdl.run_cmd_on_vm(cmds=[cmd],as_sudo=True, timeout=self.timeout)
+        result = dest_vm_hdl.return_output_cmd_dict[cmd]
+        self.logger.info("PPS : %s "%result)
+        return True
+
+    def start_pps(self,vm_fix,delay):
+        return True
+        time.sleep(delay/2)
+        tap_intf = vm_fix.tap_intf[self.vn1_fixture.vn_fq_name]['name']
+        cmd = 'cat /sys/class/net/%s/statistics/tx_packets ; sleep 1 ;  cat /sys/class/net/%s/statistics/tx_packets'%(tap_intf,tap_intf)
+        #cmd = 'cat /sys/class/net/%s/statistics/tx_bytes && cat /sys/class/net/%s/statistics/rx_bytes '%(tap_intf,tap_intf)
+        host = vm_fix.node_name
+        result = self.inputs.run_cmd_on_server(host, cmd)
+        (rx,rx1) = result.split("\n")
+        self.logger.info("PPS : %s "%result)
+        cmd = 'cat /sys/class/net/%s/statistics/rx_packets ; sleep 1 ;  cat /sys/class/net/%s/statistics/rx_packets'%(tap_intf,tap_intf)
+        result = self.inputs.run_cmd_on_server(host, cmd)
+        (tx,tx1) = result.split("\n")
+        self.logger.info("PPS : %s "%result)
+        #result = "%s,%s\n"%(int(tx1)-int(tx),int(rx1)-int(rx))
+        #cmd = 'echo %s >> pps.txt'%result
+        #result = self.inputs.run_cmd_on_server(host, cmd)
+        result = "PPS : RX %s  TX %s DURATION : %s IP : %s\n"%(int(tx1)-int(tx),int(rx1)-int(rx),delay,vm_fix.vm_ip)
+        self.logger.info(result)
+        self.print_results(result)
+        return True
+
+    def start_dpdk_l2fwd(self,vm_fix,delay):
+        time.sleep(5)
+        vm_fix.vm_username = 'root'
+        vm_fix.vm_password = 'c0ntrail123'
+        cmd = '(nohup ./start_l2fwd_app.sh >/dev/null 2>&1 &) ; sleep 5'
+        vm_fix.run_cmd_on_vm(cmds=[cmd],as_sudo=True, timeout=self.timeout)
+        return True
+
+    def start_dpdk_l3fwd(self,vm_fix,delay):
+        time.sleep(5)
+        vm_fix.vm_username = 'root'
+        vm_fix.vm_password = 'c0ntrail123'
+        cmd = 'cd /root/vrouter-pktgen-tests/ ; (nohup ./dpdk_l3fwd.sh >/dev/null 2>&1 &) ; sleep 5'
+        vm_fix.run_cmd_on_vm(cmds=[cmd],as_sudo=True, timeout=self.timeout)
+        return True
+
+
+    def start_dpdk_ptkgen(self,vm_fix_src,vm_fix_dst,payload):
+        host = vm_fix_src.node_name
+        vm_fix_src.vm_username = 'root'
+        vm_fix_src.vm_password = 'c0ntrail123'
+        cmd = 'rm /root/pktgen2vrouter*.log'
+        vm_fix_src.run_cmd_on_vm(cmds=[cmd],as_sudo=True, timeout=self.timeout)
+        cmd = 'sed -i -e s/12.1.1.4/%s/g /root/bin/dpdkgen.lua'%vm_fix_src.vm_ip
+        vm_fix_src.run_cmd_on_vm(cmds=[cmd],as_sudo=True, timeout=self.timeout)
+        cmd = 'sed -i -e s/12.1.1.3/%s/g /root/bin/dpdkgen.lua'%vm_fix_dst.vm_ip
+        vm_fix_src.run_cmd_on_vm(cmds=[cmd],as_sudo=True, timeout=self.timeout)
+        cmd = 'sed -i -e s/"size =.*"/"size = %s;"/g /root/bin/dpdkgen.lua'%payload
+        vm_fix_src.run_cmd_on_vm(cmds=[cmd],as_sudo=True, timeout=self.timeout)
+        #import pdb;pdb.set_trace()
+        cmd = 'cd /root/bin/ ; (nohup ./dpdk_run.py >/dev/null  2>&1 &) ; sleep 5'
+        vm_fix_src.run_cmd_on_vm(cmds=[cmd],as_sudo=True, timeout=self.timeout)
+        return True
+
+    def get_dpdk_results(self,vm_fix_src):
+        host = vm_fix_src.node_name
+        vm_fix_src.vm_username = 'root'
+        vm_fix_src.vm_password = 'c0ntrail123'
+        cmd = 'cat /root/pktgen2vrouter*.log'
+        result = vm_fix_src.run_cmd_on_vm(cmds=[cmd],as_sudo=True, timeout=self.timeout)
+        result = vm_fix_src.return_output_cmd_dict[cmd]
+        self.logger.info("Result : %s "%result)
+        #import pdb;pdb.set_trace()
+        result = result.replace("\r", "").replace("\t","")
+        self.print_results(result)
+        return True
+
+    def get_pps(self,host):
+        cmd = 'cat pps.txt'
+        result = self.inputs.run_cmd_on_server(host, cmd)
+        lines = result.split("\n")
+        #result = "PPS : RX %s  TX %s\n"%(int(tx1)-int(tx),int(rx1)-int(rx))
+        #self.logger.info(result)
+        #self.print_results(result)
+
+    def launch_svc_vms(self,hosts,family,image_name='dpdk-l2-no-delay'):
+        # Create two virtual networks
+        self.vn1_name='vn20000'
+        self.vn1_subnets=['12.1.1.0/24']
+        self.vn1_fq_name = "default-domain:" + self.inputs.project_name + ":" + self.vn1_name
+        self.vn2_name = 'vn30000'
+        self.vn2_subnets = ['13.1.1.0/24'] 
+        self.vn2_fq_name = "default-domain:" + self.inputs.project_name + ":" + self.vn2_name
+        self.left_rt = '2000'
+        self.right_rt = '3000'
+        self.vmlist = []
+        self.vm_fixture = []
+        self.vm_num = 1 
+        self.cpu_id_0=['16','17','18','19','20','21','22','23']
+        self.cpu_id_10=['8','9','10','11','12','13','14','15']
+        self.cpu_id_11=['24','25','26','27','28','29','30','31']
+        self.images = ['dpdk-pktgen-auto','dpdk-l3fwd-auto']
+
+        for i in range(0,self.vm_num):
+            val = random.randint(1,100000)
+            self.vmlist.append("vm-test"+str(val))
+
+        for i in range(0,len(hosts)):
+            if not self.set_perf_mode(hosts[i]):
+                self.logger.error("Not able to set perf mode ")
+            if not self.set_nova_vcpupin(hosts[i]):
+                self.logger.error("Not able to set vcpu in nova.conf")
+        
+        self.inputs.set_af(family)
+
+        if family == 'v6':
+            self.vn1_fixture= self.useFixture(VNFixture(project_name= self.inputs.project_name, connections= self.connections,vn_name=self.vn1_name, inputs= self.inputs,router_asn=self.inputs.router_asn, rt_number=self.inputs.mx_rt))
+        else:
+            self.vn1_fixture= self.useFixture(VNFixture(project_name= self.inputs.project_name, connections= self.connections,vn_name=self.vn1_name, inputs= self.inputs, subnets= self.vn1_subnets,router_asn=self.inputs.router_asn, rt_number=self.left_rt))
+            self.vn2_fixture= self.useFixture(VNFixture(project_name= self.inputs.project_name, connections= self.connections,vn_name=self.vn2_name, inputs= self.inputs, subnets= self.vn2_subnets,router_asn=self.inputs.router_asn, rt_number=self.right_rt))
+
+        assert self.vn1_fixture.verify_on_setup()
+        assert self.vn2_fixture.verify_on_setup()
+        # Create service instance 
+        self.svc_tmp_name = 'perf_svc_template'
+        self.svc_int_prefix = 'perf_vm_'
+        self.svc_policy_name = 'perf_svc_policy'
+
+        if self.set_si > 1:
+            self.dpdk_svc_scaling = True
+
+        self.perf_st_fixture , self.perf_si_fixtures = self.config_st_si(self.svc_tmp_name,
+                          self.svc_int_prefix,self.vm_num,left_vn=self.vn1_fq_name ,svc_scaling=self.dpdk_svc_scaling,max_inst=self.set_si, 
+                          right_vn=self.vn2_fq_name,svc_mode='in-network',svc_img_name=image_name,flavor='contrail_flavor_4cpu',
+                          project=self.inputs.project_name)
+        action_list = self.chain_si(self.vm_num,self.svc_int_prefix,self.inputs.project_name)
+
+        self.project.set_sec_group_for_allow_all()
+        # Create a policy 
+        self.rules = [{'direction': '<>',
+                 'protocol': 'any',
+                 'source_network': self.vn1_name,
+                 'src_ports': [0, -1],
+                 'dest_network': self.vn2_name,
+                 'dst_ports': [0, -1],
+                 'simple_action': None,
+                 'action_list': {'apply_service': action_list}
+                 }]
+
+        self.svc_policy_fixture = self.config_policy(self.svc_policy_name, self.rules)
+
+        self.vn1_policy_fix = self.attach_policy_to_vn(
+            self.svc_policy_fixture, self.vn1_fixture)
+        self.vn2_policy_fix = self.attach_policy_to_vn(
+            self.svc_policy_fixture, self.vn2_fixture)
+        time.sleep(180)
+
+        for host in hosts:
+            if not self.update_process_cpu(host,'qemu'):
+                self.logger.error("Not able to pin cpu :%s "%proc)
+
+        # Create service instance 
+        # Create a policy 
+        # Attach policy to VNs
+        # attach policy to service instance
+        return True 
+
+    def run_ixia_perf_tests(self,test_id,mode,proto,family,cores,si):
+        self.host_list = self.connections.orch.get_hosts()
+        #self.disable_hosts = self.connections.orch.get_hosts()
+        self.disable_hosts = copy.deepcopy(self.host_list) 
+        self.set_cpu_cores = cores
+        self.set_si = si
+        #self.disable_hosts = self.host_list
+        host_vm = self.disable_hosts.pop(-1)
+
+        for host in self.disable_hosts:
+            if not self.set_nova_compute_service(host,'disable'):
+                self.logger.error("Error in disabling nova compute")
+                return False
+
+        if mode == 'different':
+            if not self.launch_svc_vms([host_vm],family):
+                for host in self.host_list:
+                    self.set_nova_compute_service(host,'enable')
+                self.logger.error("Failed to launch VMs")
+                return False
+        elif mode == 'same':
+            if not self.launch_svc_vms([host_vm],family):
+                for host in self.host_list:
+                    self.set_nova_compute_service(host,'enable')
+                self.logger.error("Failed to launch VMs")
+                return False
+        if not self.run_ixia_throughput_tests(proto):
+            for host in self.host_list:
+                self.set_nova_compute_service(host,'enable')
+            self.logger.error("Failed to run ixia tests")
+            return False
+
+        if not self.cleanup_vms():
+            for host in self.host_list:
+                self.set_nova_compute_service(host,'enable')
+            self.logger.error("ERROR: In deleting service instance VM and template")
+            return False
+
+        for host in self.host_list:
+                self.set_nova_compute_service(host,'enable')
+
+        return True
+
+    def run_ixia_throughput_tests(self,proto):
+        for id in range(0,len(self.encap_type)):
+            self.update_encap_mode(self.inputs.host_data[self.inputs.cfgm_ip]['host_ip'],self.encap_type[id])
+            if proto == 'TCP':
+                if not self.start_ixia_rfc_tests():
+                    self.logger.error("ERROR in TCP throughput test")
+                    return False
+            if proto == 'UDP':
+                if not self.start_ixia_rfc_tests():
+                    self.logger.error("ERROR in TCP throughput test")
+                    return False
+        return True 
+ 
+    def start_ixia_rfc_tests(self):
+        cmd='(nohup python /root/scripts/qt.py > results 2>&1 &); sleep 5'
+        result = self.inputs.run_cmd_on_server(self.ixia_linux_host, cmd,username='root',password='contrail123')
+        self.logger.info("RFC Test Running: %s "%result)
+        while True:
+            if self.verify_ixia_test():
+               self.logger.info("RFC Test FINISHED")
+               break 
+            time.sleep(60)
+            self.logger.info("RFC Test Running")
+        return True
+
+    def verify_ixia_test(self):
+        cmd='cat results'
+        result = self.inputs.run_cmd_on_server(self.ixia_linux_host, cmd,username='root',password='contrail123')
+        if not re.findall('FINISHED',result):
+            return False
+        elif re.findall('ERROR',result): 
+            self.logger.info("RFC Test ERROR%s"%result)
+            return True 
+        else:
+            self.logger.info("RFC Test FINISHED%s"%result)
+            return True 
+
+    def cleanup_vms(self):
+        #import pdb;pdb.set_trace()
+        self.delete_si_st(self.perf_si_fixtures, self.perf_st_fixture)
+        self.detach_policy(self.vn1_policy_fix)
+        self.detach_policy(self.vn2_policy_fix)
+        self.unconfig_policy(self.svc_policy_fixture)
+#        self.delete_vn(self.vn1_fixture)
+#        self.delete_vn(self.vn2_fixture)
+        return True
+
+    def remove_from_cleanups(self, fix):
+        for cleanup in self._cleanups:
+            if fix.cleanUp in cleanup:
+                self._cleanups.remove(cleanup)
+                break
+                
+
+    def update_process_cpu(self,host,name):
+        cmd = 'ps ax | pgrep %s'%name
+        res = self.inputs.run_cmd_on_server(host, cmd)
+        res = res.replace("\r","")
+        res = res.split("\n")
+        for id in res:
+            self.logger.info("Process Id : %s "%id)
+            cmd = 'taskset -pc %s'%id
+            task_out = self.inputs.run_cmd_on_server(host, cmd)
+            task_out=task_out.split(" ")
+            self.logger.info("cpu mask :%s "%task_out[5])
+
+            if re.findall("8-15",task_out[5]):
+               if not self.set_task_pin(host,self.cpu_id_10,id):
+                    self.logger.error("Error in pinnng cpu :%s "%cmd)
+        #        del self.cpu_id_10[0]
+            elif re.findall("24-31",task_out[5]):
+                if not self.set_task_pin(host,self.cpu_id_11,id):
+                    self.logger.error("Error in pinnng cpu :%s "%cmd)
+                    return False 
+        #        del self.cpu_id_11[0]
+            elif re.findall("0-7",task_out[5]):
+                if not self.set_task_pin(host,self.cpu_id_00,id):
+                    self.logger.error("Error in pinnng cpu :%s "%cmd)
+                    return False 
+            elif re.findall("16-23",task_out[5]):
+                if not self.set_task_pin(host,self.cpu_id_0,id):
+                    self.logger.error("Error in pinnng cpu :%s "%cmd)
+                    return False 
+
+        #        del self.cpu_id_0[0]
+
+        return True
+
+    def get_cpu_core(self,cpu_id):
+        if len(cpu_id):
+            return cpu_id.pop(0) 
+        else:
+            return False
+
+    def set_task_pin(self,host,cpu_id,pid):
+        #import pdb;pdb.set_trace()
+        cpu_core = self.get_cpu_core(cpu_id)
+        if not cpu_core:
+            self.logger.error("Not able to get cpu core")
+            return False
+        for i in range(1,(self.set_cpu_cores)) :
+            cpu_core1 = self.get_cpu_core(cpu_id)
+        #cpu_core1 = (int(cpu_core) + self.set_cpu_cores - 1)
+        cmd = 'taskset -a -pc %s-%s %s'%(cpu_core,str(cpu_core1),pid)
+        task_out = self.inputs.run_cmd_on_server(host, cmd)
+        cmd = 'taskset -pc %s'%pid
+        task_out = self.inputs.run_cmd_on_server(host, cmd)
+        task_out=task_out.split(" ")
+        self.logger.info("cpu mask :%s "%task_out[5])
+        #if task_out[5] != cpu_core:
+        #    self.logger.error("cpu is not pinned :%s : %s "%(task_out[5],cpu_core))
+        #    return False
+        return True 
+
