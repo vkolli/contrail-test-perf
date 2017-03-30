@@ -364,7 +364,7 @@ class PerfBaseIxia(PerfBase,VerifySvcMirror):
                 self.set_perf_mode_disable(host)
         if image_id == 7 :
             self.start_dpdk_mq_app()
-        import pdb;pdb.set_trace()
+        
         time.sleep(300)
         if not self.run_ixia_throughput_tests(proto,test_id):
             self.logger.error("Failed to run ixia tests")
